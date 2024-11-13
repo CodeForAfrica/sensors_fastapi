@@ -182,14 +182,14 @@ async def register_node(
     return {"registered": "OK", "node_details": registered_node}
 
 
-@app.get("node/{node_id}")
-async def node_details(node_id):
-    node = get_node(node_id)
+@app.get("/node/{node_id}")
+async def node_details(node_id: str):
+    node = await get_node(node_id)
+    # print(node)
     if node is None:
-        HTTPException(status_code=404, detail="Node not found")
+        return HTTPException(status_code=404, detail="Node not found")
 
-    return
-    return node_metadata(node)
+    return await node_metadata(node)
 
 
 @app.get("/nodes")
@@ -197,7 +197,7 @@ async def get_nodes():
     return get_nodes()
 
 
-def node_metadata(node: Node):
+async def node_metadata(node: Node):
     stmt = select(Node, Location, Custodian).where(
         node.custodian_id == Custodian.id and node.location_id == Location.id
     )
@@ -205,8 +205,10 @@ def node_metadata(node: Node):
     session = Session(engine)
     node_info = session.exec(stmt).all()
     session.close()
-    print(node_info)
-    return node_info
+    node_info = [dict(row._mapping) for row in node_info]
+
+    # all() returns a list of rows. #!! all() should of course return a list containing only one row otherwise there are duplicate entries in the database
+    return node_info[0]
 
 
 # getters like
