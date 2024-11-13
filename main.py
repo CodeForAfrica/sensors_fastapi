@@ -197,6 +197,9 @@ async def get_nodes():
     return get_nodes()
 
 
+app.add_api_route("/locations", endpoint=lambda: get_all_locations())
+
+
 async def node_metadata(node: Node):
     stmt = select(Node, Location, Custodian).where(
         node.custodian_id == Custodian.id and node.location_id == Location.id
@@ -274,6 +277,14 @@ def get_custodian(name, email, phone) -> Custodian:
     if not result:
         return None
     return result[0]
+
+
+def get_all_locations(
+    offset: int = 0, limit: Annotated[int, Query(le=100)] = 100
+) -> list[Location]:
+    session = Session(engine)
+    Locations = session.exec(select(Location).offset(offset).limit(limit)).all()
+    return Locations
 
 
 # setters like
