@@ -4,11 +4,14 @@
 # 2. Create list of organizations
 # 3. Create list of sensor types
 
-from random import randrange
+from random import randrange, uniform
 import requests
 
 API_ENDPOINT = "http://127.0.0.1:8000"
 REGISTER_NODE = API_ENDPOINT + "/register-node"
+POST_DATA = API_ENDPOINT + "/push-sensor-data"
+current_node = None
+current_node_name = None
 
 sensor_locations = {
     "Ruiru": {
@@ -89,12 +92,19 @@ sensor_custodians = {
     },
 }
 
-sensors_list = [
+
+sensor_types = ["PM_Sensor", "temp_humidity", "Co2", "So2"]
+sensors_brands = [
+    "Plant Tower",
+]
+
+nodes_list = [
     {
         "esp8266-12": {
             "location": sensor_locations["Ruiru"],
             "custodian": sensor_custodians["Alice"],
             "project": projects[0],
+            "sensors": [sensor_types[0], sensor_types[1]],
         }
     },
     {
@@ -102,6 +112,7 @@ sensors_list = [
             "location": sensor_locations["Mathare"],
             "custodian": sensor_custodians["Bob"],
             "project": projects[1],
+            "sensors": [sensor_types[0], sensor_types[2]],
         }
     },
     {
@@ -109,6 +120,7 @@ sensors_list = [
             "location": sensor_locations["Langas"],
             "custodian": sensor_custodians["Charlie"],
             "project": projects[2],
+            "sensors": [sensor_types[0], sensor_types[1]],
         }
     },
     {
@@ -116,6 +128,7 @@ sensors_list = [
             "location": sensor_locations["Makongeni"],
             "custodian": sensor_custodians["John"],
             "project": None,
+            "sensors": [sensor_types[2], sensor_types[3]],
         }
     },
 ]
@@ -123,34 +136,84 @@ sensors_list = [
 
 def register_random_node():
 
-    sensor_list_length = len(sensors_list)
-    random_index = randrange(sensor_list_length)
-    sensor = sensors_list[random_index]
-    sensor_keys = sensor.keys()
+    node_list_length = len(nodes_list)
+    random_index = randrange(node_list_length)
+    node = nodes_list[random_index]
+    global current_node
+    current_node = node
+    node_keys = node.keys()
     # first_sensor_key = next(iter(sensors_keys))
-    first_sensor_key = list(sensor_keys)[0]
-    sensor_name = first_sensor_key
+    first_node_key = list(node_keys)[0]
+    global current_node_name
+    current_node_name = first_node_key
 
     data = {
-        "node_id": sensor_name,
-        "lat": sensor[first_sensor_key]["location"]["coords"]["lat"],
-        "long": sensor[first_sensor_key]["location"]["coords"]["long"],
-        "country": sensor[first_sensor_key]["location"]["country"],
-        "location": sensor[first_sensor_key]["location"]["name"],
-        "city": sensor[first_sensor_key]["location"]["city"],
+        "node_id": current_node_name,
+        "lat": node[first_node_key]["location"]["coords"]["lat"],
+        "long": node[first_node_key]["location"]["coords"]["long"],
+        "country": node[first_node_key]["location"]["country"],
+        "location": node[first_node_key]["location"]["name"],
+        "city": node[first_node_key]["location"]["city"],
         "location_tag": "",
-        "custodian_name": sensor[first_sensor_key]["custodian"]["name"],
-        "custodian_email": sensor[first_sensor_key]["custodian"]["email"],
-        "custodian_phone": sensor[first_sensor_key]["custodian"]["phone"],
+        "custodian_name": node[first_node_key]["custodian"]["name"],
+        "custodian_email": node[first_node_key]["custodian"]["email"],
+        "custodian_phone": node[first_node_key]["custodian"]["phone"],
         "software_version": "",
-        "project_name": sensor[first_sensor_key]["project"],
+        "project_name": node[first_node_key]["project"],
     }
 
-    # print(data)
+    # # print(data)
 
     response = requests.get(REGISTER_NODE, params=data)
     print(response)
-    # call post function
+
+    # send random data for this node
+    send_random_data()
 
 
 # register_random_node()
+
+
+def generate_dummy_data(lower_limit, upper_limit):
+    return round(uniform(lower_limit, upper_limit), 2)
+
+
+def send_random_data():
+    # Which sensor was randomly selected
+    # Get the sensor types
+    data = {
+        "PM1": None,
+        "PM2_5": None,
+        "PM10": None,
+        "temperature": None,
+        "humidity": None,
+    }
+    # for each sensor type generate random values
+    for sensor in current_node[current_node_name]["sensors"]:
+        print(sensor)
+        match (sensor):  # Supported from Python 3.10
+            case "PM_Sensor":
+                data["PM1"] = generate_dummy_data(0, 200)
+                data["PM2_5"] = generate_dummy_data(0, 200)
+            case "temp_humidity":
+
+                data["temperature"] = generate_dummy_data(0, 100)
+                data["humidity"] = generate_dummy_data(0, 100)
+            case _:
+                print(f"{sensor} Sensor not evaluated in this case")
+
+    is_all_data_empty = all(value == None for value in data.values())
+
+    if is_all_data_empty:
+        print("Data contains empty values in all cases")
+        print("No need to send..")
+        return
+
+    # post to timescale DB
+    data["node_id"] = current_node_name
+    print(data)
+    response = requests.post(POST_DATA, json=data)
+
+
+register_random_node()
+# send_random_data()
