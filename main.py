@@ -3,7 +3,7 @@ from typing import Annotated, Optional
 import dotenv
 import datetime
 from asyncpg import Pool, create_pool as asyncpg_create_pool
-from fastapi import FastAPI, Depends, HTTPException, Query
+from fastapi import FastAPI, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from sqlmodel import (
     Session,
@@ -79,14 +79,14 @@ class Project(SQLModel, table=True):
 
 
 # Sensor Data Model(s)
-class SensorData(BaseModel):
+class SensorData(SQLModel):
     # timestamp: datetime
     node_id: str
     PM1: float | None
     PM2_5: float | None
     PM10: float | None
     temperature: float | None
-    humidity: float
+    humidity: float | None
 
 
 dotenv.load_dotenv(override=True)
@@ -294,10 +294,21 @@ app.add_api_route("/locations", endpoint=lambda: get_all_locations())
 
 @app.post("/push-sensor-data")
 async def post_data(data: SensorData):
+    # headers = request.headers
+    # print()
+    # print("Received headers")
+    # for header in headers:
+    #     print(f"{header} : {headers[header]}")
     print()
     print("Received post data")
-    print(dict(data))
-    # await insert_data(data)
+    print(data)
+    await insert_data(data)
+    # print("body")
+    # body = await request.json()
+    # print(body)
+
+    # await insert_data(body)
+
     return {"received_data": "OK"}
 
 
@@ -435,9 +446,22 @@ def register_custodian(custodian: Custodian) -> Custodian:
 
 
 async def insert_data(data):
-    insert_sensor_data_query = f"""
-    INSERT INTO sensor_data(node_id,PM1,PM2_5,temperature,humidity)
-    VALUES('{data.node_id}',{data.PM1},{data.PM2_5},{data.temperature},{data.humidity});
-    """
-    res = await run_query(insert_sensor_data_query)
-    return res
+    data = dict(data)
+    keys_to_delete = []
+    # cannot delete dictionary while running a loop (RuntimeError: dictionary changed size during iteration)
+    for key, val in data.items():
+        if val is None:
+            keys_to_delete.append(key)
+    # delete items where value is None
+    for key in keys_to_delete:
+        del data[key]
+    print(data)
+    print(data.keys())
+    print(data.values())
+    # insert_sensor_data_query = f"""
+    # INSERT INTO sensor_data(node_id,PM1,PM2_5,temperature,humidity)
+    # VALUES('{data.node_id}',{data.PM1},{data.PM2_5},{data.temperature},{data.humidity});
+    # """
+    # res = await run_query(insert_sensor_data_query)
+    # return res
+    pass

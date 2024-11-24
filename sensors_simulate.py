@@ -99,14 +99,14 @@ sensors_brands = [
 ]
 
 nodes_list = [
-    {
-        "esp8266-12": {
-            "location": sensor_locations["Ruiru"],
-            "custodian": sensor_custodians["Alice"],
-            "project": projects[0],
-            "sensors": [sensor_types[0], sensor_types[1]],
-        }
-    },
+    # {
+    #     "esp8266-12": {
+    #         "location": sensor_locations["Ruiru"],
+    #         "custodian": sensor_custodians["Alice"],
+    #         "project": projects[0],
+    #         "sensors": [sensor_types[0], sensor_types[1]],
+    #     }
+    # },
     {
         "esp8266-34": {
             "location": sensor_locations["Mathare"],
@@ -115,22 +115,22 @@ nodes_list = [
             "sensors": [sensor_types[0], sensor_types[2]],
         }
     },
-    {
-        "esp8266-56": {
-            "location": sensor_locations["Langas"],
-            "custodian": sensor_custodians["Charlie"],
-            "project": projects[2],
-            "sensors": [sensor_types[0], sensor_types[1]],
-        }
-    },
-    {
-        "esp8266-78": {
-            "location": sensor_locations["Makongeni"],
-            "custodian": sensor_custodians["John"],
-            "project": None,
-            "sensors": [sensor_types[2], sensor_types[3]],
-        }
-    },
+    # {
+    #     "esp8266-56": {
+    #         "location": sensor_locations["Langas"],
+    #         "custodian": sensor_custodians["Charlie"],
+    #         "project": projects[2],
+    #         "sensors": [sensor_types[0], sensor_types[1]],
+    #     }
+    # },
+    # {
+    #     "esp8266-78": {
+    #         "location": sensor_locations["Makongeni"],
+    #         "custodian": sensor_custodians["John"],
+    #         "project": None,
+    #         "sensors": [sensor_types[2], sensor_types[3]],
+    #     }
+    # },
 ]
 
 
