@@ -5,13 +5,20 @@
 # 3. Create list of sensor types
 
 from random import randrange, uniform
-import requests
+import requests, time
 
 API_ENDPOINT = "http://127.0.0.1:8000"
 REGISTER_NODE = API_ENDPOINT + "/register-node"
 POST_DATA = API_ENDPOINT + "/push-sensor-data"
 current_node = None
 current_node_name = None
+start_time = time.time()
+generate_data_duration = 30 * 60
+register_random_node_interval = 5 * 60
+send_data_interval = 30
+
+last_register_node_time = 0
+last_send_data_time = 0
 
 sensor_locations = {
     "Ruiru": {
@@ -99,14 +106,14 @@ sensors_brands = [
 ]
 
 nodes_list = [
-    # {
-    #     "esp8266-12": {
-    #         "location": sensor_locations["Ruiru"],
-    #         "custodian": sensor_custodians["Alice"],
-    #         "project": projects[0],
-    #         "sensors": [sensor_types[0], sensor_types[1]],
-    #     }
-    # },
+    {
+        "esp8266-12": {
+            "location": sensor_locations["Ruiru"],
+            "custodian": sensor_custodians["Alice"],
+            "project": projects[0],
+            "sensors": [sensor_types[0], sensor_types[1]],
+        }
+    },
     {
         "esp8266-34": {
             "location": sensor_locations["Mathare"],
@@ -115,22 +122,22 @@ nodes_list = [
             "sensors": [sensor_types[0], sensor_types[2]],
         }
     },
-    # {
-    #     "esp8266-56": {
-    #         "location": sensor_locations["Langas"],
-    #         "custodian": sensor_custodians["Charlie"],
-    #         "project": projects[2],
-    #         "sensors": [sensor_types[0], sensor_types[1]],
-    #     }
-    # },
-    # {
-    #     "esp8266-78": {
-    #         "location": sensor_locations["Makongeni"],
-    #         "custodian": sensor_custodians["John"],
-    #         "project": None,
-    #         "sensors": [sensor_types[2], sensor_types[3]],
-    #     }
-    # },
+    {
+        "esp8266-56": {
+            "location": sensor_locations["Langas"],
+            "custodian": sensor_custodians["Charlie"],
+            "project": projects[2],
+            "sensors": [sensor_types[0], sensor_types[1]],
+        }
+    },
+    {
+        "esp8266-78": {
+            "location": sensor_locations["Makongeni"],
+            "custodian": sensor_custodians["John"],
+            "project": None,
+            "sensors": [sensor_types[2], sensor_types[3]],
+        }
+    },
 ]
 
 
@@ -213,7 +220,20 @@ def send_random_data():
     data["node_id"] = current_node_name
     print(data)
     response = requests.post(POST_DATA, json=data)
+    print("Insert sensor data response")
+    print(response.status_code)
 
 
+# iniatialize registration and data send for first time
 register_random_node()
-# send_random_data()
+last_register_node_time = time.time()
+send_random_data()
+last_send_data_time = time.time()
+
+while time.time() - start_time < generate_data_duration:
+    if time.time() - last_register_node_time > register_random_node_interval:
+        register_random_node
+        last_register_node_time = time.time()
+
+    elif time.time() - last_send_data_time > send_data_interval:
+        send_random_data

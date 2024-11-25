@@ -137,7 +137,7 @@ async def run_query(query):
     global tsb_conn_pool
     try:
         conn = await tsb_conn_pool.execute(query)
-        print(conn)
+        return conn
     except Exception as e:
         print(f"Error occured when running query : {e}")
         print(query)
@@ -478,5 +478,7 @@ async def insert_data(data):
     VALUES({values});
         """
     print(insert_sensor_data_query)
-    await run_query(insert_sensor_data_query)
+    res = await run_query(insert_sensor_data_query)
+    print("Insert data response")
+    print(res)
     return
