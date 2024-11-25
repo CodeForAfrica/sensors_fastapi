@@ -455,13 +455,28 @@ async def insert_data(data):
     # delete items where value is None
     for key in keys_to_delete:
         del data[key]
-    print(data)
-    print(data.keys())
-    print(data.values())
-    # insert_sensor_data_query = f"""
-    # INSERT INTO sensor_data(node_id,PM1,PM2_5,temperature,humidity)
-    # VALUES('{data.node_id}',{data.PM1},{data.PM2_5},{data.temperature},{data.humidity});
-    # """
-    # res = await run_query(insert_sensor_data_query)
-    # return res
-    pass
+
+    keys = data.keys()
+    vals = data.values()
+
+    columns = ""
+    for key in keys:
+        columns += key + ","
+    values = ""
+    for val in vals:
+        if (type(val).__name__) != "str":
+            val = str(val)
+            values += val + ","
+        else:
+            values += "'" + val + "',"
+
+    # Remove last comma which will result in an invalid SQL statement
+    columns = columns[:-1]
+    values = values[:-1]
+
+    insert_sensor_data_query = f"""INSERT INTO sensor_data({columns}) 
+    VALUES({values});
+        """
+    print(insert_sensor_data_query)
+    await run_query(insert_sensor_data_query)
+    return
