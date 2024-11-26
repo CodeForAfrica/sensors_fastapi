@@ -1,6 +1,9 @@
+import os
 from typing import Annotated, Optional
+import dotenv
 import datetime
-from fastapi import FastAPI, Depends, HTTPException, Query
+from asyncpg import Pool, create_pool as asyncpg_create_pool
+from fastapi import FastAPI, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from sqlmodel import (
     Session,
@@ -12,8 +15,10 @@ from sqlmodel import (
     Field,
     select,
 )
+from pydantic import BaseModel
 
 
+# Project metadata models
 class Node(SQLModel, table=True):
     id: int | None = Field(
         default=None, primary_key=True
@@ -73,19 +78,95 @@ class Project(SQLModel, table=True):
     description: str | None
 
 
+# Sensor Data Model(s)
+class SensorData(SQLModel):
+    # timestamp: datetime
+    node_id: str
+    PM1: float | None
+    PM2_5: float | None
+    PM10: float | None
+    temperature: float | None
+    humidity: float | None
+
+
+dotenv.load_dotenv(override=True)
+TIMESCALE_DB_CONNECTION = os.getenv("TIMESCALE_DB_CONNECTION")
+print(TIMESCALE_DB_CONNECTION)
+
 sqlite_file_name = "sensorsafrica.db"
 sqlite_url = f"sqlite:///{sqlite_file_name}"
 
 connect_args = {"check_same_thread": False}
 engine = create_engine(sqlite_url, connect_args=connect_args, echo=True)
+postgres_engine = create_engine(TIMESCALE_DB_CONNECTION, echo=True)
+
+
+tsb_conn_pool: Optional[Pool] = None
+
+# Sensor Data Table
+create_hypertable_query = """
+
+CREATE TABLE IF NOT EXISTS sensor_data (
+    time TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    node_id VARCHAR(30) NOT NULL,
+    PM1 FLOAT,
+    PM2_5 FLOAT,
+    temperature FLOAT,
+    humidity FLOAT,
+    FOREIGN KEY (node_id) REFERENCES node(node_id)
+);
+SELECT create_hypertable('sensor_data', 'time', if_not_exists => TRUE);
+"""
+
+
+async def init_connection_pool():
+    global tsb_conn_pool
+    try:
+        print("Initializing PostgreSQL connection pool...")
+        tsb_conn_pool = await asyncpg_create_pool(
+            dsn=TIMESCALE_DB_CONNECTION, min_size=1, max_size=10
+        )
+        print("PostgreSQL connection pool created successfully.")
+
+    except Exception as e:
+        print(f"Error initializing PostgreSQL connection pool: {e}")
+        raise
+
+
+async def run_query(query):
+    global tsb_conn_pool
+    try:
+        conn = await tsb_conn_pool.execute(query)
+        return conn
+    except Exception as e:
+        print(f"Error occured when running query : {e}")
+        print(query)
+        raise
+
+
+async def init_postgres() -> None:
+    """
+    Initialize the PostgreSQL connection pool and create the hypertables.
+    """
+    await init_connection_pool()
+
+    # creat tables
+    create_db_and_tables()
+
+    # create hypertables
+    await run_query(create_hypertable_query)
+
+    # # insert dummy data
+    # await run_query(dummy_sensor_data_query)
 
 
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)
+    SQLModel.metadata.create_all(postgres_engine)
 
 
 def get_session():
-    with Session(engine) as session:
+    with Session(postgres_engine) as session:
         yield session
 
 
@@ -96,8 +177,8 @@ app = FastAPI()
 
 
 @app.on_event("startup")
-def on_startup():
-    create_db_and_tables()
+async def on_startup():
+    await init_postgres()
 
 
 # Required metadata
@@ -131,11 +212,20 @@ async def register_node(
         # 1. Check if location exists or create it
         if location is not "":
             registered_location = get_location(country, location)
+            print()
+            print("Fetched Location")
+            print(registered_location)
+            print()
+
             if not registered_location:
                 locale = Location(country=country, city=city, location=location)
                 locale = create_sensor_location(locale)
                 registered_location = locale
+                print()
+                print("Auto registered")
                 print(locale)
+                print()
+
             # 2. Check if location_tag exists or create it
             if location_tag is not "":
                 registered_loc_tag = get_location_tag(location_tag)
@@ -145,12 +235,12 @@ async def register_node(
                     )
                     locale_tag = create_location_tag(locale_tag)
 
-        # 3. Check if custodian exists or create one
         else:
             raise HTTPException(
                 status=400, detail="Location and geolocation coordinates are required"
             )
 
+        # 3. Check if custodian exists or create one
         if custodian_name is not "" and (
             custodian_email is not "" or custodian_phone is not ""
         ):  # no point of registering a custodian if there is no contact details
@@ -166,19 +256,21 @@ async def register_node(
                 new_custodian = register_custodian(new_custodian)
                 custodian_id = new_custodian.id
 
-    # 4. Register node
-    new_node = Node(
-        node_id=node_id,
-        custodian_id=custodian_id,
-        latitude=lat,
-        longitude=long,
-        location_id=registered_location.id,
-    )
-    new_node = register_node(new_node)
-    registered_node = new_node
+        # 4. Register node
+        new_node = Node(
+            node_id=node_id,
+            custodian_id=custodian_id,
+            latitude=lat,
+            longitude=long,
+            location_id=registered_location.id,
+        )
+        new_node = register_node(new_node)
+        registered_node = new_node
 
-    # ? so what if node is already in the database but location or cusdian is not
+    # # ? so what if node is already in the database but location or custodian is not
+
     print(registered_node)
+
     return {"registered": "OK", "node_details": registered_node}
 
 
@@ -200,12 +292,33 @@ async def get_nodes():
 app.add_api_route("/locations", endpoint=lambda: get_all_locations())
 
 
+@app.post("/push-sensor-data")
+async def post_data(data: SensorData):
+    # headers = request.headers
+    # print()
+    # print("Received headers")
+    # for header in headers:
+    #     print(f"{header} : {headers[header]}")
+    print()
+    print("Received post data")
+    print(data)
+    await insert_data(data)
+    # print("body")
+    # body = await request.json()
+    # print(body)
+
+    # await insert_data(body)
+
+    return {"received_data": "OK"}
+
+
 async def node_metadata(node: Node):
     stmt = select(Node, Location, Custodian).where(
         node.custodian_id == Custodian.id and node.location_id == Location.id
     )
 
-    session = Session(engine)
+    # session = Session(engine)
+    session = next(get_session())
     node_info = session.exec(stmt).all()
     session.close()
     node_info = [dict(row._mapping) for row in node_info]
@@ -221,14 +334,16 @@ def get_nodes(
     offset: int = 0,
     limit: Annotated[int, Query(le=100)] = 100,
 ) -> list[Node]:
-    session = Session(engine)
+    # session = Session(engine)
+    session = next(get_session())
     Nodes = session.exec(select(Node).offset(offset).limit(limit)).all()
     return Nodes
 
 
 async def get_node(node_id) -> Node:
     print(node_id)
-    session = Session(engine)
+    # session = Session(engine)
+    session = next(get_session())
     stmt = select(Node).where(Node.node_id == node_id)
     result = session.exec(stmt).all()
     session.close()
@@ -246,7 +361,8 @@ async def get_node(node_id) -> Node:
 
 
 def get_location(country, location) -> Location:
-    session = Session(engine)
+    # session = Session(engine)
+    session = next(get_session())
     stmt = select(Location).where(
         Location.country == country and Location.location == location
     )
@@ -258,7 +374,8 @@ def get_location(country, location) -> Location:
 
 
 def get_location_tag(tag) -> LocationTag:
-    session = Session(engine)
+    # session = Session(engine)
+    session = next(get_session())
     stmt = select(LocationTag).where(LocationTag.location_tag == tag)
     result = session.exec(stmt).all()
     session.close()
@@ -268,7 +385,8 @@ def get_location_tag(tag) -> LocationTag:
 
 
 def get_custodian(name, email, phone) -> Custodian:
-    session = Session(engine)
+    # session = Session(engine)
+    session = next(get_session())
     stmt = select(Custodian).where(
         Custodian.name == name and Custodian.email == email or Custodian.phone == phone
     )
@@ -282,7 +400,8 @@ def get_custodian(name, email, phone) -> Custodian:
 def get_all_locations(
     offset: int = 0, limit: Annotated[int, Query(le=100)] = 100
 ) -> list[Location]:
-    session = Session(engine)
+    # session = Session(engine)
+    session = next(get_session())
     Locations = session.exec(select(Location).offset(offset).limit(limit)).all()
     return Locations
 
@@ -291,8 +410,8 @@ def get_all_locations(
 
 
 def register_node(node: Node) -> Node:
-    # session = next(get_session())
-    session = Session(engine)
+    session = next(get_session())
+    # session = Session(engine)
     session.add(node)
     session.commit()
     session.refresh(node)
@@ -300,7 +419,8 @@ def register_node(node: Node) -> Node:
 
 
 def create_sensor_location(location: Location) -> Location:
-    session = Session(engine)
+    # session = Session(engine)
+    session = next(get_session())
     session.add(location)
     session.commit()
     session.refresh(location)
@@ -308,7 +428,8 @@ def create_sensor_location(location: Location) -> Location:
 
 
 def create_location_tag(tag: LocationTag) -> LocationTag:
-    session = Session(engine)
+    # session = Session(engine)
+    session = next(get_session())
     session.add(tag)
     session.commit()
     session.refresh(tag)
@@ -316,8 +437,48 @@ def create_location_tag(tag: LocationTag) -> LocationTag:
 
 
 def register_custodian(custodian: Custodian) -> Custodian:
-    session = Session(engine)
+    # session = Session(engine)
+    session = next(get_session())
     session.add(custodian)
     session.commit()
     session.refresh(custodian)
     return custodian
+
+
+async def insert_data(data):
+    data = dict(data)
+    keys_to_delete = []
+    # cannot delete dictionary while running a loop (RuntimeError: dictionary changed size during iteration)
+    for key, val in data.items():
+        if val is None:
+            keys_to_delete.append(key)
+    # delete items where value is None
+    for key in keys_to_delete:
+        del data[key]
+
+    keys = data.keys()
+    vals = data.values()
+
+    columns = ""
+    for key in keys:
+        columns += key + ","
+    values = ""
+    for val in vals:
+        if (type(val).__name__) != "str":
+            val = str(val)
+            values += val + ","
+        else:
+            values += "'" + val + "',"
+
+    # Remove last comma which will result in an invalid SQL statement
+    columns = columns[:-1]
+    values = values[:-1]
+
+    insert_sensor_data_query = f"""INSERT INTO sensor_data({columns}) 
+    VALUES({values});
+        """
+    print(insert_sensor_data_query)
+    res = await run_query(insert_sensor_data_query)
+    print("Insert data response")
+    print(res)
+    return
