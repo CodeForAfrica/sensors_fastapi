@@ -14,6 +14,7 @@ from sqlmodel import (
     func,
     Field,
     select,
+    JSON,
 )
 from pydantic import BaseModel
 
@@ -79,14 +80,35 @@ class Project(SQLModel, table=True):
 
 
 # Sensor Data Model(s)
+# class SensorData(SQLModel):
+#     # timestamp: datetime
+#     node_id: str
+#     PM1: float | None
+#     PM2_5: float | None
+#     PM10: float | None
+#     temperature: float | None
+#     humidity: float | None
+
+
 class SensorData(SQLModel):
-    # timestamp: datetime
+    timestamp: datetime.datetime | None = Field(
+        default=datetime.datetime.now(datetime.timezone.utc),
+    )
     node_id: str
+    parameter: str
+    value: None
+    sensor_type: str
+    location: str
+
+
+class PMDATA(BaseModel):
     PM1: float | None
     PM2_5: float | None
     PM10: float | None
-    temperature: float | None
-    humidity: float | None
+
+
+class ParticulateMatterData(SensorData):
+    value: dict = Field(sa_column=Column(JSON), default={})
 
 
 dotenv.load_dotenv(override=True)
@@ -105,6 +127,8 @@ tsb_conn_pool: Optional[Pool] = None
 
 # Sensor Data Table
 create_hypertable_query = """
+
+DROP TABLE IF EXISTS sensors_data;
 
 CREATE TABLE IF NOT EXISTS sensor_data (
     time TIMESTAMPTZ NOT NULL DEFAULT NOW(),
