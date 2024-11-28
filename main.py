@@ -317,7 +317,7 @@ app.add_api_route("/locations", endpoint=lambda: get_all_locations())
 
 
 @app.post("/push-sensor-data")
-async def post_data(data: SensorData):
+async def post_data(data: dict):
     # headers = request.headers
     # print()
     # print("Received headers")
@@ -326,7 +326,20 @@ async def post_data(data: SensorData):
     print()
     print("Received post data")
     print(data)
-    await insert_data(data)
+
+    # ? check if sensordata key is part of the object
+
+    measurements = data["sensordata"].keys()
+    for measurement in measurements:
+        match (measurement):
+            case "PM_data":
+                pass
+            case "temp_humidity":
+                pass
+            case _:
+                print("Could not find predifined measurement")
+
+    # await insert_data(data)
     # print("body")
     # body = await request.json()
     # print(body)

@@ -6,6 +6,7 @@
 
 from random import randrange, uniform
 import requests, time
+from datetime import datetime, timezone
 
 API_ENDPOINT = "http://127.0.0.1:8000"
 REGISTER_NODE = API_ENDPOINT + "/register-node"
@@ -188,52 +189,95 @@ def generate_dummy_data(lower_limit, upper_limit):
 def send_random_data():
     # Which sensor was randomly selected
     # Get the sensor types
-    data = {
-        "PM1": None,
-        "PM2_5": None,
-        "PM10": None,
-        "temperature": None,
-        "humidity": None,
+    """sensor_data_payload_template = {
+        "timestamp": "UTC time",
+        "location": "Mathare",
+        "nodeid": "esp32-8232",
+        "sensordata": {
+            "PM_data": {
+                "values": {"PM1": 39.4, "PM2_5": 12.3, "PM10": 23.4},
+                "sensor_type": "PM55003",
+                "units": "ug/m3",
+            },
+        },
+        "temp_humidity": {
+            "values": {"temp": 25, "rel_hum": 60, "abs_hum": 45},
+            "sensor_type": "DHT22",
+            "units": "C",
+        },
+        "geo_data": {"long": 36.30503, "lat": -1.1244, "alt": 1466},
+    }"""
+    sensordata = {
+        "PM_data": {
+            "values": {
+                "PM1": None,
+                "PM2_5": None,
+                "PM10": None,
+            },
+            "sensor_name": "PMS5003",
+        },
+        "temp_humidity": {
+            "values": {"temp": None, "rel_hum": None, "abs_hum": None},
+            "sensor_type": "DHT22",
+        },
     }
     # for each sensor type generate random values
     for sensor in current_node[current_node_name]["sensors"]:
         print(sensor)
         match (sensor):  # Supported from Python 3.10
             case "PM_Sensor":
-                data["PM1"] = generate_dummy_data(0, 200)
-                data["PM2_5"] = generate_dummy_data(0, 200)
+                sensordata["PM_data"]["values"]["PM1"] = generate_dummy_data(0, 200)
+                sensordata["PM_data"]["values"]["PM2_5"] = generate_dummy_data(0, 200)
             case "temp_humidity":
 
-                data["temperature"] = generate_dummy_data(0, 100)
-                data["humidity"] = generate_dummy_data(0, 100)
+                sensordata["temp_humidity"]["values"]["temp"] = generate_dummy_data(
+                    0, 100
+                )
+                sensordata["temp_humidity"]["values"]["rel_hum"] = generate_dummy_data(
+                    0, 100
+                )
             case _:
                 print(f"{sensor} Sensor not evaluated in this case")
 
-    is_all_data_empty = all(value == None for value in data.values())
+    is_all_data_empty = all(
+        value == None for value in sensordata["PM_data"]["values"].values()
+    )  # now just checks only PM data
 
     if is_all_data_empty:
         print("Data contains empty values in all cases")
         print("No need to send..")
         return
 
+    print(sensordata)
+
     # post to timescale DB
-    data["node_id"] = current_node_name
-    print(data)
-    response = requests.post(POST_DATA, json=data)
-    print("Insert sensor data response")
-    print(response.status_code)
+    payload = {
+        "timestamp": datetime.now(timezone.utc),
+        "node_id": current_node_name,
+        "location": current_node[current_node_name]["location"]["name"],
+        "sensordata": sensordata,
+    }
+
+    print(payload)
+
+    # response = requests.post(POST_DATA, json=payload)
+    # print("Insert sensor data response")
+    # print(response.status_code)
 
 
 # iniatialize registration and data send for first time
+# register_random_node()
+# last_register_node_time = time.time()
+# send_random_data()
+# last_send_data_time = time.time()
+
+# while time.time() - start_time < generate_data_duration:
+#     if time.time() - last_register_node_time > register_random_node_interval:
+#         register_random_node
+#         last_register_node_time = time.time()
+
+#     elif time.time() - last_send_data_time > send_data_interval:
+#         send_random_data
+
+
 register_random_node()
-last_register_node_time = time.time()
-send_random_data()
-last_send_data_time = time.time()
-
-while time.time() - start_time < generate_data_duration:
-    if time.time() - last_register_node_time > register_random_node_interval:
-        register_random_node
-        last_register_node_time = time.time()
-
-    elif time.time() - last_send_data_time > send_data_interval:
-        send_random_data
