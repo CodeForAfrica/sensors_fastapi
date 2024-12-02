@@ -128,18 +128,20 @@ tsb_conn_pool: Optional[Pool] = None
 # Sensor Data Table
 create_hypertable_query = """
 
-DROP TABLE IF EXISTS sensors_data;
+DROP TABLE IF EXISTS sensors_PM_data;
 
-CREATE TABLE IF NOT EXISTS sensor_data (
-    time TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+CREATE TABLE IF NOT EXISTS sensor_PM_data (
+    time TIMESTAMPTZ NOT NULL,
     node_id VARCHAR(30) NOT NULL,
     PM1 FLOAT,
     PM2_5 FLOAT,
-    temperature FLOAT,
-    humidity FLOAT,
+    PM10 FLOAT,
+    location VARCHAR(64) NOT NULL,
+    sensor_name VARCHAR(64) NOT NULL,
     FOREIGN KEY (node_id) REFERENCES node(node_id)
 );
-SELECT create_hypertable('sensor_data', 'time', if_not_exists => TRUE);
+
+SELECT create_hypertable('sensor_PM_data', 'time', if_not_exists => TRUE);
 """
 
 
