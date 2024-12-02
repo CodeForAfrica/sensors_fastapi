@@ -252,7 +252,7 @@ def send_random_data():
 
     # post to timescale DB
     payload = {
-        "timestamp": datetime.now(timezone.utc),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "node_id": current_node_name,
         "location": current_node[current_node_name]["location"]["name"],
         "sensordata": sensordata,
@@ -260,9 +260,9 @@ def send_random_data():
 
     print(payload)
 
-    # response = requests.post(POST_DATA, json=payload)
-    # print("Insert sensor data response")
-    # print(response.status_code)
+    response = requests.post(POST_DATA, json=payload)
+    print("Insert sensor data response")
+    print(response.status_code)
 
 
 # iniatialize registration and data send for first time

@@ -333,7 +333,11 @@ async def post_data(data: dict):
     for measurement in measurements:
         match (measurement):
             case "PM_data":
-                pass
+                min_data = delete_none_values(data["sensordata"][measurement]["values"])
+                # print(min_data)
+                min_data["node_id"] = data["node_id"]
+                query_stmt = generate_insert_query(min_data)
+                await insert_data(query_stmt)
             case "temp_humidity":
                 pass
             case _:
@@ -482,8 +486,8 @@ def register_custodian(custodian: Custodian) -> Custodian:
     return custodian
 
 
-async def insert_data(data):
-    data = dict(data)
+def delete_none_values(dic):
+    data = dict(dic)
     keys_to_delete = []
     # cannot delete dictionary while running a loop (RuntimeError: dictionary changed size during iteration)
     for key, val in data.items():
@@ -493,6 +497,10 @@ async def insert_data(data):
     for key in keys_to_delete:
         del data[key]
 
+    return data
+
+
+def generate_insert_query(data):
     keys = data.keys()
     vals = data.values()
 
@@ -511,11 +519,14 @@ async def insert_data(data):
     columns = columns[:-1]
     values = values[:-1]
 
-    insert_sensor_data_query = f"""INSERT INTO sensor_data({columns}) 
+    insert_query = f"""INSERT INTO sensor_data({columns}) 
     VALUES({values});
         """
-    print(insert_sensor_data_query)
-    res = await run_query(insert_sensor_data_query)
+    return insert_query
+
+
+async def insert_data(stmt):
+    res = await run_query(stmt)
     print("Insert data response")
     print(res)
     return
