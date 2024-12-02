@@ -111,6 +111,8 @@ class ParticulateMatterData(SensorData):
     value: dict = Field(sa_column=Column(JSON), default={})
 
 
+sensor_data_hypertables = {"PM_data": "sensor_PM_data"}
+
 dotenv.load_dotenv(override=True)
 TIMESCALE_DB_CONNECTION = os.getenv("TIMESCALE_DB_CONNECTION")
 print(TIMESCALE_DB_CONNECTION)
@@ -126,11 +128,11 @@ postgres_engine = create_engine(TIMESCALE_DB_CONNECTION, echo=True)
 tsb_conn_pool: Optional[Pool] = None
 
 # Sensor Data Table
-create_hypertable_query = """
+create_hypertable_query = f"""
 
-DROP TABLE IF EXISTS sensors_PM_data;
+DROP TABLE IF EXISTS {sensor_data_hypertables["PM_data"]};
 
-CREATE TABLE IF NOT EXISTS sensor_PM_data (
+CREATE TABLE IF NOT EXISTS {sensor_data_hypertables["PM_data"]} (
     time TIMESTAMPTZ NOT NULL,
     node_id VARCHAR(30) NOT NULL,
     PM1 FLOAT,
@@ -141,7 +143,7 @@ CREATE TABLE IF NOT EXISTS sensor_PM_data (
     FOREIGN KEY (node_id) REFERENCES node(node_id)
 );
 
-SELECT create_hypertable('sensor_PM_data', 'time', if_not_exists => TRUE);
+SELECT create_hypertable('{sensor_data_hypertables["PM_data"]}', 'time', if_not_exists => TRUE);
 """
 
 
@@ -340,8 +342,13 @@ async def post_data(data: dict):
                     **pm_values
                 )  # validate #? create custom validator to show keys mismatch with model
                 min_data = delete_none_values(pm_values)
+                min_data["time"] = data["timestamp"]
                 min_data["node_id"] = data["node_id"]
-                query_stmt = generate_insert_query(min_data)
+                min_data["location"] = data["location"]
+                min_data["sensor_name"] = data["sensordata"][measurement]["sensor_name"]
+                query_stmt = generate_insert_query(
+                    min_data, sensor_data_hypertables["PM_data"]
+                )
                 await insert_data(query_stmt)
             case "temp_humidity":
                 pass
@@ -505,7 +512,7 @@ def delete_none_values(dic):
     return data
 
 
-def generate_insert_query(data):
+def generate_insert_query(data: dict, table: str):
     keys = data.keys()
     vals = data.values()
 
@@ -524,7 +531,7 @@ def generate_insert_query(data):
     columns = columns[:-1]
     values = values[:-1]
 
-    insert_query = f"""INSERT INTO sensor_data({columns}) 
+    insert_query = f"""INSERT INTO {table}({columns}) 
     VALUES({values});
         """
     return insert_query
