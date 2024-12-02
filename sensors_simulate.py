@@ -196,13 +196,13 @@ def send_random_data():
         "sensordata": {
             "PM_data": {
                 "values": {"PM1": 39.4, "PM2_5": 12.3, "PM10": 23.4},
-                "sensor_type": "PM55003",
+                "sensor_name": "PM55003",
                 "units": "ug/m3",
             },
         },
         "temp_humidity": {
             "values": {"temp": 25, "rel_hum": 60, "abs_hum": 45},
-            "sensor_type": "DHT22",
+            "sensor_name": "DHT22",
             "units": "C",
         },
         "geo_data": {"long": 36.30503, "lat": -1.1244, "alt": 1466},
@@ -217,8 +217,8 @@ def send_random_data():
             "sensor_name": "PMS5003",
         },
         "temp_humidity": {
-            "values": {"temp": None, "rel_hum": None, "abs_hum": None},
-            "sensor_type": "DHT22",
+            "values": {"temperature": None, "rel_hum": None, "abs_hum": None},
+            "sensor_name": "DHT22",
         },
     }
     # for each sensor type generate random values
@@ -230,8 +230,8 @@ def send_random_data():
                 sensordata["PM_data"]["values"]["PM2_5"] = generate_dummy_data(0, 200)
             case "temp_humidity":
 
-                sensordata["temp_humidity"]["values"]["temp"] = generate_dummy_data(
-                    0, 100
+                sensordata["temp_humidity"]["values"]["temperature"] = (
+                    generate_dummy_data(0, 100)
                 )
                 sensordata["temp_humidity"]["values"]["rel_hum"] = generate_dummy_data(
                     0, 100

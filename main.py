@@ -107,11 +107,21 @@ class PMDATA(BaseModel):
     PM10: float | None = None
 
 
+class Temp_Humidity(BaseModel):
+    temperature: float | None = None
+    rel_hum: float | None = None
+    abs_hum: float | None = None
+    heat_index: float | None = None
+
+
 class ParticulateMatterData(SensorData):
     value: dict = Field(sa_column=Column(JSON), default={})
 
 
-sensor_data_hypertables = {"PM_data": "sensor_PM_data"}
+sensor_data_hypertables = {
+    "PM_data": "sensor_PM_data",
+    "temp_humidity": "sensor_temp_humidity_data",
+}
 
 dotenv.load_dotenv(override=True)
 TIMESCALE_DB_CONNECTION = os.getenv("TIMESCALE_DB_CONNECTION")
@@ -131,6 +141,7 @@ tsb_conn_pool: Optional[Pool] = None
 create_hypertable_query = f"""
 
 DROP TABLE IF EXISTS {sensor_data_hypertables["PM_data"]};
+DROP TABLE IF EXISTS {sensor_data_hypertables["temp_humidity"]};
 
 CREATE TABLE IF NOT EXISTS {sensor_data_hypertables["PM_data"]} (
     time TIMESTAMPTZ NOT NULL,
@@ -142,8 +153,20 @@ CREATE TABLE IF NOT EXISTS {sensor_data_hypertables["PM_data"]} (
     sensor_name VARCHAR(64) NOT NULL,
     FOREIGN KEY (node_id) REFERENCES node(node_id)
 );
+CREATE TABLE IF NOT EXISTS {sensor_data_hypertables["temp_humidity"]} (
+    time TIMESTAMPTZ NOT NULL,
+    node_id VARCHAR(30) NOT NULL,
+    temperature FLOAT,
+    rel_hum FLOAT,
+    abs_hum FLOAT,
+    heat_index FLOAT,
+    location VARCHAR(64) NOT NULL,
+    sensor_name VARCHAR(64) NOT NULL,
+    FOREIGN KEY (node_id) REFERENCES node(node_id)
+);
 
 SELECT create_hypertable('{sensor_data_hypertables["PM_data"]}', 'time', if_not_exists => TRUE);
+SELECT create_hypertable('{sensor_data_hypertables["temp_humidity"]}', 'time', if_not_exists => TRUE);
 """
 
 
@@ -351,7 +374,19 @@ async def post_data(data: dict):
                 )
                 await insert_data(query_stmt)
             case "temp_humidity":
-                pass
+                temp_values = data["sensordata"][measurement]["values"]
+                temp_data = Temp_Humidity(
+                    **temp_values
+                )  # validate #? create custom validator to show keys mismatch with model
+                min_data = delete_none_values(temp_values)
+                min_data["time"] = data["timestamp"]
+                min_data["node_id"] = data["node_id"]
+                min_data["location"] = data["location"]
+                min_data["sensor_name"] = data["sensordata"][measurement]["sensor_name"]
+                query_stmt = generate_insert_query(
+                    min_data, sensor_data_hypertables["temp_humidity"]
+                )
+                await insert_data(query_stmt)
             case _:
                 print("Could not find predifined measurement")
 
