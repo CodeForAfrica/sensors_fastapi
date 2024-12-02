@@ -102,9 +102,9 @@ class SensorData(SQLModel):
 
 
 class PMDATA(BaseModel):
-    PM1: float | None
-    PM2_5: float | None
-    PM10: float | None
+    PM1: float | None = None
+    PM2_5: float | None = None
+    PM10: float | None = None
 
 
 class ParticulateMatterData(SensorData):
@@ -333,8 +333,11 @@ async def post_data(data: dict):
     for measurement in measurements:
         match (measurement):
             case "PM_data":
-                min_data = delete_none_values(data["sensordata"][measurement]["values"])
-                # print(min_data)
+                pm_values = data["sensordata"][measurement]["values"]
+                pm_data = PMDATA(
+                    **pm_values
+                )  # validate #? create custom validator to show keys mismatch with model
+                min_data = delete_none_values(pm_values)
                 min_data["node_id"] = data["node_id"]
                 query_stmt = generate_insert_query(min_data)
                 await insert_data(query_stmt)
