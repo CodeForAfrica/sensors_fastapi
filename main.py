@@ -14,6 +14,7 @@ from sqlmodel import (
     func,
     Field,
     select,
+    JSON,
 )
 from pydantic import BaseModel
 
@@ -79,15 +80,48 @@ class Project(SQLModel, table=True):
 
 
 # Sensor Data Model(s)
-class SensorData(SQLModel):
-    # timestamp: datetime
-    node_id: str
-    PM1: float | None
-    PM2_5: float | None
-    PM10: float | None
-    temperature: float | None
-    humidity: float | None
+# class SensorData(SQLModel):
+#     # timestamp: datetime
+#     node_id: str
+#     PM1: float | None
+#     PM2_5: float | None
+#     PM10: float | None
+#     temperature: float | None
+#     humidity: float | None
 
+
+class SensorData(SQLModel):
+    timestamp: datetime.datetime | None = Field(
+        default=datetime.datetime.now(datetime.timezone.utc),
+    )
+    node_id: str
+    parameter: str
+    value: None
+    sensor_type: str
+    location: str
+
+
+class PMDATA(BaseModel):
+    PM1: float | None = None
+    PM2_5: float | None = None
+    PM10: float | None = None
+
+
+class Temp_Humidity(BaseModel):
+    temperature: float | None = None
+    rel_hum: float | None = None
+    abs_hum: float | None = None
+    heat_index: float | None = None
+
+
+class ParticulateMatterData(SensorData):
+    value: dict = Field(sa_column=Column(JSON), default={})
+
+
+sensor_data_hypertables = {
+    "PM_data": "sensor_PM_data",
+    "temp_humidity": "sensor_temp_humidity_data",
+}
 
 dotenv.load_dotenv(override=True)
 TIMESCALE_DB_CONNECTION = os.getenv("TIMESCALE_DB_CONNECTION")
@@ -104,18 +138,35 @@ postgres_engine = create_engine(TIMESCALE_DB_CONNECTION, echo=True)
 tsb_conn_pool: Optional[Pool] = None
 
 # Sensor Data Table
-create_hypertable_query = """
+create_hypertable_query = f"""
 
-CREATE TABLE IF NOT EXISTS sensor_data (
-    time TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+DROP TABLE IF EXISTS {sensor_data_hypertables["PM_data"]};
+DROP TABLE IF EXISTS {sensor_data_hypertables["temp_humidity"]};
+
+CREATE TABLE IF NOT EXISTS {sensor_data_hypertables["PM_data"]} (
+    time TIMESTAMPTZ NOT NULL,
     node_id VARCHAR(30) NOT NULL,
     PM1 FLOAT,
     PM2_5 FLOAT,
-    temperature FLOAT,
-    humidity FLOAT,
+    PM10 FLOAT,
+    location VARCHAR(64) NOT NULL,
+    sensor_name VARCHAR(64) NOT NULL,
     FOREIGN KEY (node_id) REFERENCES node(node_id)
 );
-SELECT create_hypertable('sensor_data', 'time', if_not_exists => TRUE);
+CREATE TABLE IF NOT EXISTS {sensor_data_hypertables["temp_humidity"]} (
+    time TIMESTAMPTZ NOT NULL,
+    node_id VARCHAR(30) NOT NULL,
+    temperature FLOAT,
+    rel_hum FLOAT,
+    abs_hum FLOAT,
+    heat_index FLOAT,
+    location VARCHAR(64) NOT NULL,
+    sensor_name VARCHAR(64) NOT NULL,
+    FOREIGN KEY (node_id) REFERENCES node(node_id)
+);
+
+SELECT create_hypertable('{sensor_data_hypertables["PM_data"]}', 'time', if_not_exists => TRUE);
+SELECT create_hypertable('{sensor_data_hypertables["temp_humidity"]}', 'time', if_not_exists => TRUE);
 """
 
 
@@ -293,7 +344,7 @@ app.add_api_route("/locations", endpoint=lambda: get_all_locations())
 
 
 @app.post("/push-sensor-data")
-async def post_data(data: SensorData):
+async def post_data(data: dict):
     # headers = request.headers
     # print()
     # print("Received headers")
@@ -302,7 +353,44 @@ async def post_data(data: SensorData):
     print()
     print("Received post data")
     print(data)
-    await insert_data(data)
+
+    # ? check if sensordata key is part of the object
+
+    measurements = data["sensordata"].keys()
+    for measurement in measurements:
+        match (measurement):
+            case "PM_data":
+                pm_values = data["sensordata"][measurement]["values"]
+                pm_data = PMDATA(
+                    **pm_values
+                )  # validate #? create custom validator to show keys mismatch with model
+                min_data = delete_none_values(pm_values)
+                min_data["time"] = data["timestamp"]
+                min_data["node_id"] = data["node_id"]
+                min_data["location"] = data["location"]
+                min_data["sensor_name"] = data["sensordata"][measurement]["sensor_name"]
+                query_stmt = generate_insert_query(
+                    min_data, sensor_data_hypertables["PM_data"]
+                )
+                await insert_data(query_stmt)
+            case "temp_humidity":
+                temp_values = data["sensordata"][measurement]["values"]
+                temp_data = Temp_Humidity(
+                    **temp_values
+                )  # validate #? create custom validator to show keys mismatch with model
+                min_data = delete_none_values(temp_values)
+                min_data["time"] = data["timestamp"]
+                min_data["node_id"] = data["node_id"]
+                min_data["location"] = data["location"]
+                min_data["sensor_name"] = data["sensordata"][measurement]["sensor_name"]
+                query_stmt = generate_insert_query(
+                    min_data, sensor_data_hypertables["temp_humidity"]
+                )
+                await insert_data(query_stmt)
+            case _:
+                print("Could not find predifined measurement")
+
+    # await insert_data(data)
     # print("body")
     # body = await request.json()
     # print(body)
@@ -445,8 +533,8 @@ def register_custodian(custodian: Custodian) -> Custodian:
     return custodian
 
 
-async def insert_data(data):
-    data = dict(data)
+def delete_none_values(dic):
+    data = dict(dic)
     keys_to_delete = []
     # cannot delete dictionary while running a loop (RuntimeError: dictionary changed size during iteration)
     for key, val in data.items():
@@ -456,6 +544,10 @@ async def insert_data(data):
     for key in keys_to_delete:
         del data[key]
 
+    return data
+
+
+def generate_insert_query(data: dict, table: str):
     keys = data.keys()
     vals = data.values()
 
@@ -474,11 +566,14 @@ async def insert_data(data):
     columns = columns[:-1]
     values = values[:-1]
 
-    insert_sensor_data_query = f"""INSERT INTO sensor_data({columns}) 
+    insert_query = f"""INSERT INTO {table}({columns}) 
     VALUES({values});
         """
-    print(insert_sensor_data_query)
-    res = await run_query(insert_sensor_data_query)
+    return insert_query
+
+
+async def insert_data(stmt):
+    res = await run_query(stmt)
     print("Insert data response")
     print(res)
     return
