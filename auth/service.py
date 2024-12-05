@@ -16,8 +16,11 @@ class AuthService:
         stmt = select(User).where(User.email == email)
         user = await session.exec(stmt).first()
         session.close()
-
         return user
+
+    async def verify_user_exists(func, arg) -> bool:
+        user = await func(arg)
+        return True if user is not None else False
 
     async def create_user(self, user_data, session: AsyncSession):
         data = dict(user_data)
