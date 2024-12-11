@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
-from .schemas import UserCreateModel
+from .schemas import UserCreateModel, UserLoginModel
 from .service import AuthService
+from .utils import verify_password, create_access_token
 
 
 auth_router = APIRouter()
@@ -30,3 +31,32 @@ async def signup_user(user_data: UserCreateModel):
     else:
         auth_service.create_user(user_data)
         return "Registration successful"
+
+
+@auth_router.post("/login")
+async def login_user(form_data: UserLoginModel):
+    email = form_data.email
+    password = form_data.password
+    user = await auth_service.get_user_by_email(email)
+
+    if user is not None:
+        is_pwd_valid = verify_password(password, user.hashed_password)
+
+        if is_pwd_valid:
+            access_token = create_access_token(
+                data={"email": user.email, "uid": str(user.uid)}
+            )
+            refresh_token = create_access_token(
+                data={"email": user.email, "uid": str(user.uid)},
+                expiry=60 * 60 * 24 * 7,
+                refresh=True,
+            )
+
+            return {
+                "message": "login successful",
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+                "user": {"email": user.email, "uid": str(user.uid)},
+            }
+
+    raise HTTPException(status_code=403, detail="Invalid email or password")
