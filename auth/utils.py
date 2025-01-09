@@ -1,11 +1,10 @@
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
 import jwt, uuid
-from utils import create_access_token
 
 DEFAULT_TOKEN_EXPIRY = 60 * 60 * 24
 
-password_context = CryptContext(schemes=["bycrypt"], deprecated="auto")
+password_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def hash_password(plain_passqord: str) -> str:
