@@ -17,6 +17,7 @@ from sqlmodel import (
     JSON,
 )
 from pydantic import BaseModel
+from auth.router import auth_router
 
 
 # Project metadata models
@@ -232,8 +233,7 @@ async def on_startup():
     await init_postgres()
 
 
-# Required metadata
-# node id, application type,
+app.include_router(auth_router)
 
 
 @app.get("/register-node/")
