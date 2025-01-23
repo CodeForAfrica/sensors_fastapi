@@ -20,16 +20,17 @@ async def signup_user(user_data: UserCreateModel):
     email_exists = await auth_service.verify_user_exists(
         auth_service.get_user_by_username, email
     )
+    email_exists = False
     if username_exists:
         return HTTPException(
-            status=403,
+            status_code=403,
             detail="A user with that username exists. Please try another one.",
         )
     elif email_exists:
-        return HTTPException(status=403, detail="A user with that email exists.")
+        return HTTPException(status_code=403, detail="A user with that email exists.")
 
     else:
-        auth_service.create_user(user_data)
+        await auth_service.create_user(user_data)
         return "Registration successful"
 
 
