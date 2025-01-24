@@ -15,7 +15,7 @@ from sqlmodel import (
 )
 from pydantic import BaseModel
 from auth.router import auth_router
-from db import get_session, run_query, init_postgres
+from db import get_session, run_query, init_postgres, sensor_data_hypertables
 
 
 # Project metadata models
@@ -117,11 +117,11 @@ class ParticulateMatterData(SensorData):
     value: dict = Field(sa_column=Column(JSON), default={})
 
 
-sqlite_file_name = "sensorsafrica.db"
-sqlite_url = f"sqlite:///{sqlite_file_name}"
+# sqlite_file_name = "sensorsafrica.db"
+# sqlite_url = f"sqlite:///{sqlite_file_name}"
 
-connect_args = {"check_same_thread": False}
-engine = create_engine(sqlite_url, connect_args=connect_args, echo=True)
+# connect_args = {"check_same_thread": False}
+# engine = create_engine(sqlite_url, connect_args=connect_args, echo=True)
 
 
 app = FastAPI()

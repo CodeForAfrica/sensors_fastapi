@@ -1,10 +1,7 @@
-from fastapi import Depends
 from sqlmodel import select
-from sqlmodel.ext.asyncio.session import AsyncSession
 from .models import User
 from .utils import hash_password
-from db import SessionDep, get_session
-from sqlmodel import Session
+from db import get_session
 
 
 class AuthService:
@@ -22,7 +19,7 @@ class AuthService:
     async def get_user_by_email(self, email: str):
         session = next(get_session())
         stmt = select(User).where(User.email == email)
-        user = await session.exec(stmt).first()
+        user = session.exec(stmt).first()
         session.close()
         return user
 

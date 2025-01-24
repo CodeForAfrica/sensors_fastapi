@@ -21,10 +21,12 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def create_access_token(data: dict, expiry: timedelta = None, refresh: bool = False):
     expiry = datetime.now() + (
-        expiry if expiry is not None else timedelta(seconds=DEFAULT_TOKEN_EXPIRY)
+        timedelta(seconds=expiry)
+        if expiry is not None
+        else timedelta(seconds=DEFAULT_TOKEN_EXPIRY)
     )
     payload = {"user": data}
-    payload["expires"] = expiry
+    payload["expires"] = str(expiry)
     payload["refresh"] = refresh
     payload["token_id"] = str(uuid.uuid4())
 

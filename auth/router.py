@@ -41,23 +41,22 @@ async def login_user(form_data: UserLoginModel):
     user = await auth_service.get_user_by_email(email)
 
     if user is not None:
+        uid = str(user.uid)  # ? Create a parser function to handle SQLModel objects
         is_pwd_valid = verify_password(password, user.hashed_password)
 
         if is_pwd_valid:
-            access_token = create_access_token(
-                data={"email": user.email, "uid": str(user.uid)}
-            )
+            access_token = create_access_token(data={"email": user.email, "uid": uid})
             refresh_token = create_access_token(
-                data={"email": user.email, "uid": str(user.uid)},
+                data={"email": user.email, "uid": uid},
                 expiry=60 * 60 * 24 * 7,
                 refresh=True,
             )
 
-            return {
-                "message": "login successful",
-                "access_token": access_token,
-                "refresh_token": refresh_token,
-                "user": {"email": user.email, "uid": str(user.uid)},
-            }
+        return {
+            "message": "login successful",
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "user": {"email": user.email, "uid": user.uid},
+        }
 
     raise HTTPException(status_code=403, detail="Invalid email or password")
