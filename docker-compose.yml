@@ -1,0 +1,29 @@
+services:
+  timescaledb:
+    image: timescale/timescaledb-ha:pg16
+    container_name: timescaledb_sensors
+    ports:
+      - "5434:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=postgres
+    volumes:
+      - timescaledata:/var/lib/postgresql/data/
+  api:
+    build:
+      context: .
+    container_name: fastapi
+    environment:
+      TIMESCALE_DB_CONNECTION: ${TIMESCALE_DB_CONNECTION:-postgresql://postgres:password@timescaledb:5432/postgres}
+      TIMESCALE_DB_ASYNC_CONNECTION: ${TIMESCALE_DB_ASYNC_CONNECTION:-postgresql+asyncpg://postgres:password@timescaledb:5432/postgres}
+      JWT_SECRET_KEY: ${JWT_SECRET:-e74c351078860957b6bc53d5f42f85ab}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+
+    depends_on:
+      - timescaledb
+    ports:
+      - "8000:80"
+
+volumes:
+  timescaledata:
