@@ -266,18 +266,18 @@ def send_random_data():
 
 
 # iniatialize registration and data send for first time
-# register_random_node()
-# last_register_node_time = time.time()
-# send_random_data()
-# last_send_data_time = time.time()
-
-# while time.time() - start_time < generate_data_duration:
-#     if time.time() - last_register_node_time > register_random_node_interval:
-#         register_random_node
-#         last_register_node_time = time.time()
-
-#     elif time.time() - last_send_data_time > send_data_interval:
-#         send_random_data
-
-
 register_random_node()
+last_register_node_time = time.time()
+send_random_data()
+last_send_data_time = time.time()
+
+while time.time() - start_time < generate_data_duration:
+    if time.time() - last_register_node_time > register_random_node_interval:
+        register_random_node
+        last_register_node_time = time.time()
+
+    elif time.time() - last_send_data_time > send_data_interval:
+        send_random_data
+
+
+# register_random_node()
