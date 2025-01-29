@@ -1,21 +1,14 @@
 from fastapi import APIRouter, HTTPException, Query
 from typing import Annotated
 from .models import Node, Location, LocationTag, Custodian, PMDATA, Temp_Humidity
-from .utils import (
-    insert_data,
-    generate_insert_query,
-    delete_none_values,
-    sensor_data_hypertables,
-)
+from .utils import insert_data, generate_insert_query, delete_none_values
 from sqlmodel import select
-from db import get_session
+from db import get_session, sensor_data_hypertables
 
 sensors_router = APIRouter()
 
 
-sensors_router.get("/register-node/")
-
-
+@sensors_router.get("/register-node/")
 async def register_node(
     node_id: str = "",
     sensor_application: str = "stationary",
@@ -104,9 +97,7 @@ async def register_node(
     return {"registered": "OK", "node_details": registered_node}
 
 
-sensors_router.get("/node/{node_id}")
-
-
+@sensors_router.get("/node/{node_id}")
 async def node_details(node_id: str):
     node = await get_node(node_id)
     # print(node)
@@ -116,9 +107,7 @@ async def node_details(node_id: str):
     return await node_metadata(node)
 
 
-sensors_router.get("/nodes")
-
-
+@sensors_router.get("/nodes")
 async def get_nodes():
     return get_nodes()
 
@@ -126,9 +115,7 @@ async def get_nodes():
 sensors_router.add_api_route("/locations", endpoint=lambda: get_all_locations())
 
 
-sensors_router.post("/push-sensor-data")
-
-
+@sensors_router.post("/push-sensor-data")
 async def post_data(data: dict):
     # headers = request.headers
     # print()
