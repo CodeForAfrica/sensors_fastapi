@@ -20,7 +20,7 @@ class BaseTokenBearer(HTTPBearer):
         if not valid_token:
             raise HTTPException(status_code=403, detail="Invalid or expired token")
 
-        self.verify_token(token)
+        self.verify_token(valid_token)
 
         return valid_token
 
@@ -34,6 +34,7 @@ class BaseTokenBearer(HTTPBearer):
 
 class AccessTokenBearer(BaseTokenBearer):
     def verify_token(self, token_data: dict) -> None:
+        # print(token_data)
         if token_data and token_data["refresh"]:
             raise HTTPException(
                 status_code=403, detail="Please provide an access token"

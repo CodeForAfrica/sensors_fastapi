@@ -1,10 +1,13 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import Annotated
 from .models import Node, Location, LocationTag, Custodian, PMDATA, Temp_Humidity
 from .utils import insert_data, generate_insert_query, delete_none_values
 from sqlmodel import select
 from db import get_session, sensor_data_hypertables
+from auth.dependencies import AccessTokenBearer
 
+access_token = AccessTokenBearer()
+# sensors_router = APIRouter(dependencies=[Depends(access_token)]) # Authenticate all routes
 sensors_router = APIRouter()
 
 
@@ -98,7 +101,7 @@ async def register_node(
 
 
 @sensors_router.get("/node/{node_id}")
-async def node_details(node_id: str):
+async def node_details(node_id: str, token=Depends(access_token)):
     node = await get_node(node_id)
     # print(node)
     if node is None:
@@ -108,7 +111,7 @@ async def node_details(node_id: str):
 
 
 @sensors_router.get("/nodes")
-async def get_nodes():
+async def get_nodes(token=Depends(access_token)):
     return get_nodes()
 
 
