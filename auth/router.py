@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from .schemas import UserCreateModel, UserLoginModel
 from .service import AuthService
 from .utils import verify_password, create_access_token
-
+from .dependencies import RefreshTokenBearer
+from datetime import datetime
 
 auth_router = APIRouter()
 auth_service = AuthService()
@@ -60,3 +61,19 @@ async def login_user(form_data: UserLoginModel):
         }
 
     raise HTTPException(status_code=403, detail="Invalid email or password")
+
+
+@auth_router.get("/refresh_access_token")
+async def refresh_access_token(token_data: dict = Depends(RefreshTokenBearer())):
+    """Issue new access token using a referesh token"""
+
+    expires = datetime.strptime(
+        token_data["expires"], "%Y-%m-%d %H:%M:%S.%f"
+    )  # timestamp example 2025-02-07 10:38:29.475885
+
+    if expires < datetime.now():
+        raise HTTPException(status_code=403, detail="Refresh token expired")
+
+    else:
+        access_token = create_access_token(data=token_data["user"])
+        return {"access_token": access_token}
